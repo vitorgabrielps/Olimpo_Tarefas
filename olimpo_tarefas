@@ -1,0 +1,624 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Plus, 
+  Trash2, 
+  CheckCircle2, 
+  Circle, 
+  X,
+  Leaf,
+  Crown,
+  Sparkles,
+  Palmtree,
+  Moon,
+  Sun,
+  Pencil,
+  AlertTriangle
+} from 'lucide-react';
+
+const LOCAL_STORAGE_KEY = 'olimpo_tasks_data';
+const THEME_STORAGE_KEY = 'olimpo_theme_preference';
+
+const App = () => {
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    return savedTheme === 'true';
+  });
+
+  const [lists, setLists] = useState(() => {
+    const savedLists = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedLists) {
+      try {
+        return JSON.parse(savedLists);
+      } catch (error) {
+        console.error("Erro ao carregar listas", error);
+        return [];
+      }
+    }
+    return [
+      {
+        id: '1',
+        title: 'Gestão de Património',
+        tasks: [
+          { id: 't1', text: 'Reunião com o arquiteto paisagista', completed: true },
+          { id: 't2', text: 'Rever portfólio de investimentos do trimestre', completed: false },
+          { id: 't3', text: 'Renovar seguro do iate', completed: false },
+        ]
+      },
+      {
+        id: '2',
+        title: 'Eventos Sociais',
+        tasks: [
+          { id: 't4', text: 'Confirmar presença na Gala de Beneficência', completed: false },
+          { id: 't5', text: 'Encomendar arranjos florais para o jantar', completed: true },
+          { id: 't6', text: 'Prova de vinhos na quinta', completed: false },
+        ]
+      },
+      {
+        id: '3',
+        title: 'Bem-Estar & Saúde',
+        tasks: [
+          { id: 't7', text: 'Sessão de spa e massagem termal', completed: false },
+          { id: 't8', text: 'Prática de yoga no jardim de inverno', completed: false },
+        ]
+      }
+    ];
+  });
+
+  const [newListTitle, setNewListTitle] = useState('');
+  const [showAddList, setShowAddList] = useState(false);
+  const carouselRef = useRef(null);
+
+  // Estado para o Menu de Ações (Toque longo)
+  const [actionMenu, setActionMenu] = useState({ 
+    isOpen: false, 
+    type: null, // 'list' ou 'task'
+    listId: null, 
+    taskId: null, 
+    currentText: '',
+    mode: 'menu' // 'menu', 'edit', 'deleteConfirm'
+  });
+
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(lists));
+  }, [lists]);
+
+  useEffect(() => {
+    localStorage.setItem(THEME_STORAGE_KEY, isDarkMode);
+  }, [isDarkMode]);
+
+  // ---- Funções de Manipulação de Dados ----
+
+  const addList = (e) => {
+    e.preventDefault();
+    if (!newListTitle.trim()) return;
+    setLists([...lists, { id: Date.now().toString(), title: newListTitle, tasks: [] }]);
+    setNewListTitle('');
+    setShowAddList(false);
+    setTimeout(() => {
+      if (carouselRef.current) {
+        carouselRef.current.scrollTo({ left: carouselRef.current.scrollWidth, behavior: 'smooth' });
+      }
+    }, 100);
+  };
+
+  const deleteList = (listId) => {
+    setLists(lists.filter(list => list.id !== listId));
+    closeActionMenu();
+  };
+
+  const editList = (listId, newTitle) => {
+    if (!newTitle.trim()) return;
+    setLists(lists.map(list => list.id === listId ? { ...list, title: newTitle } : list));
+    closeActionMenu();
+  };
+
+  const addTask = (listId, taskText) => {
+    if (!taskText.trim()) return;
+    setLists(lists.map(list => list.id === listId ? { ...list, tasks: [...list.tasks, { id: Date.now().toString(), text: taskText, completed: false }] } : list));
+  };
+
+  const toggleTask = (listId, taskId) => {
+    setLists(lists.map(list => list.id === listId ? { ...list, tasks: list.tasks.map(task => task.id === taskId ? { ...task, completed: !task.completed } : task) } : list));
+  };
+
+  const deleteTask = (listId, taskId) => {
+    setLists(lists.map(list => list.id === listId ? { ...list, tasks: list.tasks.filter(task => task.id !== taskId) } : list));
+    closeActionMenu();
+  };
+
+  const editTask = (listId, taskId, newText) => {
+    if (!newText.trim()) return;
+    setLists(lists.map(list => list.id === listId ? { ...list, tasks: list.tasks.map(task => task.id === taskId ? { ...task, text: newText } : task) } : list));
+    closeActionMenu();
+  };
+
+  // ---- Funções do Menu de Ações ----
+
+  const openActionMenu = (type, listId, taskId, currentText) => {
+    // Usar uma vibração sutil se o dispositivo suportar (Haptic Feedback)
+    if (navigator.vibrate) navigator.vibrate(50);
+    
+    setActionMenu({
+      isOpen: true,
+      type,
+      listId,
+      taskId,
+      currentText,
+      mode: 'menu'
+    });
+  };
+
+  const closeActionMenu = () => {
+    setActionMenu({ ...actionMenu, isOpen: false });
+  };
+
+  // ---- Componentes Internos ----
+
+  const ActionModal = () => {
+    const [editInput, setEditInput] = useState(actionMenu.currentText);
+
+    if (!actionMenu.isOpen) return null;
+
+    const isList = actionMenu.type === 'list';
+    const title = isList ? 'Pilar de Organização' : 'Compromisso';
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-6 animate-in fade-in duration-200">
+        {/* Overlay escuro com desfoque */}
+        <div 
+          className="absolute inset-0 bg-[#000000]/40 backdrop-blur-md"
+          onClick={closeActionMenu}
+        />
+        
+        {/* Caixa do Modal */}
+        <div className={`relative w-full max-w-sm rounded-[2rem] p-8 shadow-2xl transition-all ${
+          isDarkMode ? 'bg-[#121a15] border border-[#243329]' : 'bg-white border border-[#e2e8e4]'
+        }`}>
+          
+          {actionMenu.mode === 'menu' && (
+            <div className="flex flex-col gap-3">
+              <div className="text-center mb-4">
+                <Crown size={24} className="text-[#D4AF37] mx-auto mb-2" strokeWidth={1.5} />
+                <h3 className={`font-serif text-lg tracking-wide ${isDarkMode ? 'text-[#D4AF37]' : 'text-[#183a29]'}`}>
+                  {title}
+                </h3>
+                <p className={`text-xs font-light truncate px-4 mt-1 ${isDarkMode ? 'text-[#84948a]' : 'text-[#748277]'}`}>
+                  "{actionMenu.currentText}"
+                </p>
+              </div>
+
+              <button 
+                onClick={() => setActionMenu({ ...actionMenu, mode: 'edit' })}
+                className={`flex items-center justify-center gap-3 py-3.5 rounded-2xl font-medium transition-all ${
+                  isDarkMode ? 'bg-[#1c261f] text-[#d1d7d3] hover:bg-[#243329] border border-[#243329]' : 'bg-[#f4f7f5] text-[#2c352d] hover:bg-[#e2e8e4] border border-[#e2e8e4]'
+                }`}
+              >
+                <Pencil size={18} className="text-[#D4AF37]" />
+                Modificar Texto
+              </button>
+
+              <button 
+                onClick={() => setActionMenu({ ...actionMenu, mode: 'deleteConfirm' })}
+                className={`flex items-center justify-center gap-3 py-3.5 rounded-2xl font-medium transition-all ${
+                  isDarkMode ? 'bg-[#3d1a1a]/40 text-[#ff8a8a] hover:bg-[#3d1a1a]/80 border border-[#3d1a1a]' : 'bg-[#fff0f0] text-[#d32f2f] hover:bg-[#ffe0e0] border border-[#ffe0e0]'
+                }`}
+              >
+                <Trash2 size={18} />
+                Eliminar Permanentemente
+              </button>
+
+              <button 
+                onClick={closeActionMenu}
+                className={`mt-2 py-3 rounded-2xl font-bold uppercase tracking-widest text-[10px] transition-all ${
+                  isDarkMode ? 'text-[#84948a] hover:text-[#d1d7d3]' : 'text-[#a4b3a9] hover:text-[#2c352d]'
+                }`}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          {actionMenu.mode === 'edit' && (
+            <div className="flex flex-col gap-6">
+              <div className="text-center">
+                <h3 className={`font-serif text-lg tracking-wide ${isDarkMode ? 'text-[#D4AF37]' : 'text-[#183a29]'}`}>
+                  Reescrever {title}
+                </h3>
+              </div>
+              
+              <input
+                type="text"
+                autoFocus
+                value={editInput}
+                onChange={(e) => setEditInput(e.target.value)}
+                className={`w-full bg-transparent border-b-2 text-center text-lg px-2 py-3 focus:outline-none font-light transition-colors ${
+                  isDarkMode 
+                    ? 'border-[#3a4d41] text-[#D4AF37] focus:border-[#D4AF37]' 
+                    : 'border-[#d8e0db] text-[#183a29] focus:border-[#183a29]'
+                }`}
+              />
+
+              <div className="flex gap-3 mt-2">
+                <button 
+                  onClick={closeActionMenu}
+                  className={`flex-1 py-3 rounded-full font-bold uppercase tracking-widest text-xs transition-all border ${
+                    isDarkMode ? 'border-[#3a4d41] text-[#84948a] hover:bg-[#1c261f]' : 'border-[#e2e8e4] text-[#748277] hover:bg-[#f4f7f5]'
+                  }`}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={() => isList ? editList(actionMenu.listId, editInput) : editTask(actionMenu.listId, actionMenu.taskId, editInput)}
+                  disabled={!editInput.trim()}
+                  className={`flex-1 py-3 rounded-full font-bold uppercase tracking-widest text-xs transition-all shadow-lg ${
+                    isDarkMode
+                      ? 'bg-[#D4AF37] text-[#0d1310] hover:bg-[#e0be55] disabled:opacity-40'
+                      : 'bg-[#183a29] text-[#D4AF37] hover:bg-[#214d37] disabled:opacity-40'
+                  }`}
+                >
+                  Salvar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {actionMenu.mode === 'deleteConfirm' && (
+            <div className="flex flex-col gap-6 text-center">
+              <AlertTriangle size={36} className="mx-auto text-red-500 mb-2 animate-pulse" />
+              <div>
+                <h3 className={`font-serif text-lg tracking-wide ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                  Tem certeza?
+                </h3>
+                <p className={`text-sm font-light mt-2 ${isDarkMode ? 'text-[#84948a]' : 'text-[#748277]'}`}>
+                  Esta ação não pode ser desfeita e os dados serão perdidos.
+                </p>
+              </div>
+              
+              <div className="flex gap-3 mt-2">
+                <button 
+                  onClick={() => setActionMenu({ ...actionMenu, mode: 'menu' })}
+                  className={`flex-1 py-3 rounded-full font-bold uppercase tracking-widest text-xs transition-all border ${
+                    isDarkMode ? 'border-[#3a4d41] text-[#84948a] hover:bg-[#1c261f]' : 'border-[#e2e8e4] text-[#748277] hover:bg-[#f4f7f5]'
+                  }`}
+                >
+                  Voltar
+                </button>
+                <button 
+                  onClick={() => isList ? deleteList(actionMenu.listId) : deleteTask(actionMenu.listId, actionMenu.taskId)}
+                  className="flex-1 py-3 rounded-full font-bold uppercase tracking-widest text-xs transition-all shadow-lg bg-red-600 text-white hover:bg-red-700"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const ListCard = ({ list }) => {
+    const [newTaskText, setNewTaskText] = useState('');
+
+    const handleAddTask = (e) => {
+      e.preventDefault();
+      addTask(list.id, newTaskText);
+      setNewTaskText('');
+    };
+
+    const completedTasks = list.tasks.filter(t => t.completed).length;
+    const totalTasks = list.tasks.length;
+    const progress = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
+
+    return (
+      <div className={`snap-center shrink-0 w-[85vw] sm:w-[380px] h-[75vh] max-h-[750px] flex flex-col rounded-t-[3.5rem] rounded-b-3xl overflow-hidden transition-all duration-500 shadow-2xl relative border ${
+        isDarkMode ? 'bg-[#17201a] border-[#243329] shadow-[0_20px_50px_rgba(0,0,0,0.5)]' : 'bg-white border-[#e2e8e4] shadow-[0_20px_50px_rgba(27,67,50,0.15)] hover:shadow-[0_30px_60px_rgba(27,67,50,0.2)]'
+      }`}>
+        
+        {/* Cabeçalho do Cartão com TOQUE LONGO habilitado */}
+        {/* Adicionado propriedades para evitar a seleção de texto e menu nativo no mobile */}
+        <div 
+          onContextMenu={(e) => {
+            e.preventDefault(); // Previne o menu de clique direito do navegador
+            openActionMenu('list', list.id, null, list.title);
+          }}
+          className={`px-8 pt-10 pb-5 relative z-10 transition-colors duration-500 cursor-context-menu select-none [-webkit-touch-callout:none] active:opacity-80 ${
+            isDarkMode ? 'bg-[#0f1511]' : 'bg-[#183a29]'
+          }`}
+          title="Pressione e segure para Opções"
+        >
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 text-[#D4AF37] opacity-90 pointer-events-none">
+            <Crown size={22} strokeWidth={1.5} />
+          </div>
+
+          <div className="flex justify-center items-center mb-5 mt-2 relative pointer-events-none">
+            <h2 className="text-xl font-serif text-[#D4AF37] tracking-wider text-center w-full drop-shadow-sm truncate px-4">
+              {list.title}
+            </h2>
+          </div>
+          
+          <div className="space-y-2 pointer-events-none">
+            <div className={`flex justify-center text-[10px] font-medium uppercase tracking-widest ${isDarkMode ? 'text-[#84948a]' : 'text-[#8aa696]'}`}>
+              <span>{progress}% Concluído</span>
+            </div>
+            <div className={`h-[2px] w-24 mx-auto rounded-full overflow-hidden ${isDarkMode ? 'bg-[#243329]' : 'bg-[#214d37]'}`}>
+              <div 
+                className="h-full bg-gradient-to-r from-[#B8942A] to-[#F3D779] transition-all duration-700 ease-out shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Área de Tarefas */}
+        <div className={`flex-1 overflow-y-auto px-6 py-6 space-y-3 custom-scrollbar relative z-10 transition-colors duration-500 ${
+          isDarkMode ? 'bg-[#17201a]' : 'bg-[#fcfdfc]'
+        }`}>
+          {list.tasks.length === 0 ? (
+            <div className={`h-full flex flex-col items-center justify-center ${isDarkMode ? 'text-[#52665a]' : 'text-[#a4b3a9]'}`}>
+              <Sparkles size={32} className="mb-4 text-[#D4AF37] opacity-60" strokeWidth={1} />
+              <p className="text-sm font-light text-center tracking-wide pointer-events-none">Um espaço em branco,<br/>pronto para ser moldado.</p>
+            </div>
+          ) : (
+            list.tasks.map(task => (
+              <div 
+                key={task.id} 
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  openActionMenu('task', list.id, task.id, task.text);
+                }}
+                className={`group flex items-start gap-4 p-3.5 rounded-2xl transition-all duration-300 border cursor-context-menu select-none [-webkit-touch-callout:none] active:scale-[0.98] ${
+                  task.completed 
+                    ? (isDarkMode ? 'bg-[#131b16] border-transparent opacity-60' : 'bg-[#f4f7f5] border-transparent opacity-70')
+                    : (isDarkMode ? 'bg-[#1c261f] border-[#243329] hover:border-[#D4AF37]/30' : 'bg-white border-[#e2e8e4] hover:border-[#D4AF37]/40 hover:shadow-sm')
+                }`}
+                title="Pressione e segure para Opções"
+              >
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation(); // Evita conflito com o toque longo
+                    toggleTask(list.id, task.id);
+                  }}
+                  className="mt-0.5 flex-shrink-0 focus:outline-none transition-transform active:scale-90"
+                >
+                  {task.completed ? (
+                    <CheckCircle2 size={22} className="text-[#D4AF37]" strokeWidth={1.5} />
+                  ) : (
+                    <Circle size={22} className={`${isDarkMode ? 'text-[#3a4d41] group-hover:text-[#D4AF37]' : 'text-[#c6d1cb] group-hover:text-[#D4AF37]'} transition-colors`} strokeWidth={1.5} />
+                  )}
+                </button>
+                
+                <span className={`flex-1 text-[15px] font-light leading-relaxed transition-all duration-300 pointer-events-none ${
+                  task.completed 
+                    ? (isDarkMode ? 'text-[#52665a] line-through decoration-[#3a4d41]' : 'text-[#a4b3a9] line-through decoration-[#d8e0db]')
+                    : (isDarkMode ? 'text-[#d1d7d3]' : 'text-[#2c352d]')
+                }`}>
+                  {task.text}
+                </span>
+                
+                {/* Dica visual muito sutil para usuários desktop de que há mais opções */}
+                <div className={`opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity ${isDarkMode ? 'text-[#3a4d41]' : 'text-[#d8e0db]'}`}>
+                  <div className="w-1 h-1 rounded-full bg-current mx-[1px]"></div>
+                  <div className="w-1 h-1 rounded-full bg-current mx-[1px]"></div>
+                  <div className="w-1 h-1 rounded-full bg-current mx-[1px]"></div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Rodapé Verde */}
+        <div className={`px-6 pb-6 pt-4 relative z-10 transition-colors duration-500 border-t-0 ${
+          isDarkMode ? 'bg-[#0f1511]' : 'bg-[#183a29]'
+        }`}>
+          <form onSubmit={handleAddTask} className="relative">
+            <input
+              type="text"
+              value={newTaskText}
+              onChange={(e) => setNewTaskText(e.target.value)}
+              placeholder="Adicionar novo compromisso..."
+              className={`w-full bg-transparent border-b text-sm font-light px-2 py-3 focus:outline-none transition-colors ${
+                isDarkMode 
+                  ? 'border-[#243329] text-[#D4AF37] focus:border-[#D4AF37] placeholder:text-[#3a4d41]' 
+                  : 'border-[#2a573e] text-[#D4AF37] focus:border-[#D4AF37] placeholder:text-[#527d64]'
+              }`}
+            />
+            <button 
+              type="submit"
+              disabled={!newTaskText.trim()}
+              className="absolute right-0 top-1/2 -translate-y-1/2 p-2 text-[#D4AF37] disabled:opacity-30 transition-all hover:scale-110 hover:drop-shadow-[0_0_8px_rgba(212,175,55,0.6)]"
+            >
+              <Plus size={20} strokeWidth={1.5} />
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className={`min-h-screen font-sans overflow-hidden flex flex-col transition-colors duration-700 relative selection:bg-[#D4AF37] selection:text-white ${
+      isDarkMode ? 'bg-[#0d1310] text-[#d1d7d3]' : 'bg-[#f0f2ef] text-[#2c352d]'
+    }`}>
+      
+      <ActionModal />
+
+      {/* Fundo Decorativo */}
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-40 pointer-events-none mix-blend-overlay"></div>
+      
+      <div className={`absolute top-0 left-0 w-[40rem] h-[40rem] opacity-20 blur-[100px] rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none transition-colors duration-1000 ${
+        isDarkMode ? 'bg-[#183a29]' : 'bg-[#1b4332]'
+      }`}></div>
+      <div className={`absolute bottom-0 right-0 w-[40rem] h-[40rem] opacity-[0.08] blur-[100px] rounded-full translate-x-1/3 translate-y-1/3 pointer-events-none transition-colors duration-1000 ${
+        isDarkMode ? 'bg-[#D4AF37]' : 'bg-[#D4AF37]'
+      }`}></div>
+
+      <Leaf className={`absolute top-12 -left-12 w-64 h-64 -rotate-45 pointer-events-none transition-colors duration-1000 ${
+        isDarkMode ? 'text-[#183a29] opacity-30' : 'text-[#1b4332] opacity-10'
+      }`} />
+      <Leaf className={`absolute bottom-12 -right-12 w-80 h-80 rotate-45 pointer-events-none transition-colors duration-1000 ${
+        isDarkMode ? 'text-[#183a29] opacity-30' : 'text-[#1b4332] opacity-10'
+      }`} />
+
+      <style dangerouslySetInnerHTML={{__html: `
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: ${isDarkMode ? '#243329' : '#d8e0db'}; border-radius: 10px; }
+        .custom-scrollbar:hover::-webkit-scrollbar-thumb { background: #D4AF37; }
+        
+        /* Prevenir realce de toque no mobile */
+        * { -webkit-tap-highlight-color: transparent; }
+      `}} />
+
+      {/* Header Fixo */}
+      <header className="px-8 md:px-16 pt-8 pb-4 flex justify-between items-center shrink-0 relative z-20">
+        <div className="flex items-center gap-5">
+          <div className={`w-14 h-14 rounded-full border flex items-center justify-center backdrop-blur-md shadow-lg transition-colors duration-500 ${
+            isDarkMode ? 'bg-[#121a15]/80 border-[#D4AF37]/50 shadow-[#0d1310]' : 'bg-[#183a29] border-[#D4AF37]'
+          }`}>
+            <Crown size={26} className="text-[#D4AF37]" strokeWidth={1.5} />
+          </div>
+          <div>
+            <h1 className={`text-3xl font-serif tracking-widest uppercase transition-colors duration-500 ${
+              isDarkMode ? 'text-[#D4AF37]' : 'text-[#183a29]'
+            }`}>
+              Olimpo
+            </h1>
+            <p className={`font-light text-sm mt-1 tracking-wider transition-colors duration-500 ${
+              isDarkMode ? 'text-[#84948a]' : 'text-[#52665a]'
+            }`}>
+              A sua harmonia diária
+            </p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`p-3 rounded-full border transition-all duration-300 focus:outline-none flex items-center justify-center ${
+              isDarkMode 
+                ? 'bg-[#17201a] border-[#3a4d41] text-[#D4AF37] hover:border-[#D4AF37]/50 hover:bg-[#1c261f]' 
+                : 'bg-white border-[#e2e8e4] text-[#183a29] hover:border-[#183a29]/30 hover:bg-[#f4f7f5] shadow-sm'
+            }`}
+            title={isDarkMode ? "Modo Diurno" : "Modo Noturno"}
+          >
+            {isDarkMode ? <Sun size={20} strokeWidth={1.5} /> : <Moon size={20} strokeWidth={1.5} />}
+          </button>
+
+          <button 
+            onClick={() => setShowAddList(true)}
+            className={`px-6 py-3 rounded-full border font-medium tracking-wide text-sm transition-all duration-300 focus:outline-none flex items-center gap-2 shadow-lg ${
+              isDarkMode
+                ? 'bg-[#D4AF37] border-[#D4AF37] text-[#0d1310] hover:bg-[#e0be55] hover:shadow-[0_4px_20px_rgba(212,175,55,0.3)]'
+                : 'bg-[#183a29] border-[#183a29] text-[#D4AF37] hover:bg-[#214d37] hover:shadow-[0_4px_20px_rgba(24,58,41,0.4)]'
+            }`}
+          >
+            <Plus size={18} />
+            <span className="hidden sm:inline uppercase tracking-widest text-xs font-bold">Nova Categoria</span>
+          </button>
+        </div>
+      </header>
+
+      {/* Container Principal */}
+      <main className="flex-1 relative flex flex-col justify-start z-10">
+        {lists.length === 0 && !showAddList ? (
+          <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+            <div className={`w-24 h-24 mb-6 rounded-full border flex items-center justify-center shadow-lg transition-colors duration-500 ${
+              isDarkMode ? 'bg-[#121a15] border-[#243329]' : 'bg-white border-[#e2e8e4]'
+            }`}>
+              <Palmtree size={40} className="text-[#D4AF37] opacity-90" strokeWidth={1} />
+            </div>
+            <h3 className={`text-2xl font-serif mb-3 tracking-wide transition-colors duration-500 ${
+              isDarkMode ? 'text-[#D4AF37]' : 'text-[#183a29]'
+            }`}>
+              Jardim Intocado
+            </h3>
+            <p className={`max-w-md font-light leading-relaxed transition-colors duration-500 ${
+              isDarkMode ? 'text-[#84948a]' : 'text-[#52665a]'
+            }`}>
+              Não existem compromissos registados. Crie a sua primeira categoria para começar a organizar o seu dia com serenidade.
+            </p>
+          </div>
+        ) : (
+          <div 
+            ref={carouselRef}
+            className="flex gap-10 overflow-x-auto snap-x snap-mandatory px-8 md:px-16 hide-scrollbar pt-6 pb-12 items-start h-full"
+          >
+            {lists.map(list => (
+              <ListCard key={list.id} list={list} />
+            ))}
+
+            {showAddList && (
+              <div className={`snap-center shrink-0 w-[85vw] sm:w-[380px] h-[75vh] max-h-[750px] flex flex-col justify-center rounded-t-[3.5rem] rounded-b-3xl p-10 transition-all duration-500 relative border shadow-2xl ${
+                isDarkMode ? 'bg-[#121a15]/80 backdrop-blur-md border-[#D4AF37]/30 shadow-[#0d1310]' : 'bg-white/80 backdrop-blur-md border-[#183a29]/20 shadow-[0_20px_50px_rgba(27,67,50,0.1)]'
+              }`}>
+                <button 
+                  onClick={() => setShowAddList(false)}
+                  className={`absolute top-10 right-10 transition-colors ${
+                    isDarkMode ? 'text-[#84948a] hover:text-[#D4AF37]' : 'text-[#a4b3a9] hover:text-[#183a29]'
+                  }`}
+                >
+                  <X size={24} strokeWidth={1} />
+                </button>
+                <div className="text-center mb-10 mt-8">
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner border transition-colors duration-500 ${
+                    isDarkMode ? 'bg-[#17201a] border-[#D4AF37]/40 text-[#D4AF37]' : 'bg-[#f4f7f5] border-[#183a29]/20 text-[#183a29]'
+                  }`}>
+                    <Plus size={32} strokeWidth={1.5} />
+                  </div>
+                  <h3 className={`text-2xl font-serif tracking-wider uppercase transition-colors duration-500 ${
+                    isDarkMode ? 'text-[#D4AF37]' : 'text-[#183a29]'
+                  }`}>
+                    Nova Categoria
+                  </h3>
+                  <p className={`text-sm font-light mt-4 transition-colors duration-500 ${
+                    isDarkMode ? 'text-[#84948a]' : 'text-[#748277]'
+                  }`}>
+                    Estabeleça um novo pilar para a sua organização.
+                  </p>
+                </div>
+                
+                <form onSubmit={addList} className="space-y-10 w-full">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={newListTitle}
+                    onChange={(e) => setNewListTitle(e.target.value)}
+                    placeholder="Ex: Finanças, Viagens..."
+                    className={`w-full bg-transparent border-b-2 text-center text-lg px-4 py-3 focus:outline-none shadow-none font-light transition-colors duration-300 ${
+                      isDarkMode 
+                        ? 'border-[#3a4d41] text-[#D4AF37] focus:border-[#D4AF37] placeholder:text-[#3a4d41]' 
+                        : 'border-[#d8e0db] text-[#183a29] focus:border-[#183a29] placeholder:text-[#c6d1cb]'
+                    }`}
+                  />
+                  <div className="pt-4 flex justify-center">
+                    <button 
+                      type="submit"
+                      disabled={!newListTitle.trim()}
+                      className={`px-12 py-3.5 rounded-full font-bold uppercase tracking-widest text-xs transition-all duration-300 shadow-xl ${
+                        isDarkMode
+                          ? 'bg-[#D4AF37] text-[#0d1310] hover:bg-[#e0be55] hover:shadow-[0_4px_20px_rgba(212,175,55,0.3)] disabled:opacity-40 disabled:hover:bg-[#D4AF37]'
+                          : 'bg-[#183a29] text-[#D4AF37] hover:bg-[#214d37] hover:shadow-[0_4px_20px_rgba(24,58,41,0.4)] disabled:opacity-40 disabled:hover:bg-[#183a29]'
+                      }`}
+                    >
+                      Criar Pilar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+            
+            {lists.length > 0 && <div className="shrink-0 w-[5vw] sm:w-[10vw]"></div>}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default App;
+
+
